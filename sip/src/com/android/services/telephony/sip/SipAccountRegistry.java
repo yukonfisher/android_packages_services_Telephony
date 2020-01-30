@@ -25,6 +25,7 @@ import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 import android.util.Log;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -67,7 +68,7 @@ public final class SipAccountRegistry {
                             mProfile,
                             SipUtil.createIncomingCallPendingIntent(context,
                                     mProfile.getProfileName()),
-                            null);
+                            SipUtil.createRegistrationListener(context));
                 } else {
                     sipManager.open(mProfile);
                 }
@@ -161,9 +162,7 @@ public final class SipAccountRegistry {
      * @param sipProfileName Name of the SIP profile.
      */
     public void removeSipProfile(String sipProfileName) {
-        AccountEntry accountEntry = getAccountEntry(sipProfileName);
-
-        if (accountEntry != null) {
+        for (AccountEntry accountEntry : getAccountEntries(sipProfileName)) {
             mAccounts.remove(accountEntry);
         }
     }
@@ -180,9 +179,8 @@ public final class SipAccountRegistry {
      */
     void stopSipService(Context context, String sipProfileName) {
         // Stop the sip service for the profile.
-        AccountEntry accountEntry = getAccountEntry(sipProfileName);
-        if (accountEntry != null ) {
-            SipManager sipManager = SipManager.newInstance(context);
+        SipManager sipManager = SipManager.newInstance(context);
+        for (AccountEntry accountEntry : getAccountEntries(sipProfileName)) {
             accountEntry.stopSipService(sipManager);
         }
 
@@ -287,6 +285,16 @@ public final class SipAccountRegistry {
             }
         }
         return null;
+    }
+
+    private List<AccountEntry> getAccountEntries(String sipProfileName) {
+        List<AccountEntry> accountEntries = new ArrayList<AccountEntry>();
+        for (AccountEntry entry : mAccounts) {
+            if (Objects.equals(sipProfileName, entry.getProfile().getProfileName())) {
+                accountEntries.add(entry);
+            }
+        }
+        return accountEntries;
     }
 
     private void log(String message) {

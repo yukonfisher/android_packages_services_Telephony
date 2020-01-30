@@ -16,14 +16,19 @@
 
 package com.android.services.telephony.sip;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
+import android.net.sip.SipErrorCode;
 import android.net.sip.SipManager;
 import android.net.sip.SipProfile;
+import android.net.sip.SipRegistrationListener;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.telecom.PhoneAccount;
@@ -231,5 +236,92 @@ public class SipUtil {
         } catch (Exception e) {
             Log.d(LOG_TAG, "updateAutoRegistrationFlag, exception: " + e);
         }
+    }
+
+    public static SipRegistrationListener createRegistrationListener(Context context) {
+        final int notificationId = 0x1001;
+        final String channelId = Integer.toString(notificationId);
+
+        NotificationManager notificationMgr = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationChannel notificationChannel = notificationMgr.getNotificationChannel(channelId);
+        if (notificationChannel == null) {
+            notificationChannel = new NotificationChannel(channelId, "SIP Registration Status", NotificationManager.IMPORTANCE_MIN);
+            notificationMgr.createNotificationChannel(notificationChannel);
+        }
+        Notification.Builder notificationBuilder = new Notification.Builder(context, channelId);
+
+        return new SipRegistrationListener() {
+            private void showRegistrationMessage(String title, String text) {
+                final SipPreferences sipPreferences = new SipPreferences(context);
+                boolean isReceivingCalls = sipPreferences.isReceivingCallsEnabled();
+                boolean isRegistrationDone = text == context.getString(R.string.registration_status_done);
+
+                if (!isReceivingCalls || isRegistrationDone) {
+                    notificationMgr.cancel(notificationId);
+                }
+                else {
+                    notificationBuilder
+                        .setOngoing(true)
+                        .setSmallIcon(android.R.drawable.stat_sys_warning)
+                        .setContentTitle(title)
+                        .setContentText(text);
+
+                    notificationMgr.notify(notificationId, notificationBuilder.build());
+                }
+
+                if (context instanceof SipSettings) {
+                    SipSettings sipSettings = (SipSettings)context;
+                    sipSettings.showRegistrationMessage(title, text);
+                }
+            }
+
+            @Override
+            public void onRegistrationDone(String profileUri, long expiryTime) {
+                showRegistrationMessage(profileUri, context.getString(
+                        R.string.registration_status_done));
+            }
+
+            @Override
+            public void onRegistering(String profileUri) {
+                showRegistrationMessage(profileUri, context.getString(
+                        R.string.registration_status_registering));
+            }
+
+            @Override
+            public void onRegistrationFailed(String profileUri, int errorCode,
+                    String message) {
+                switch (errorCode) {
+                    case SipErrorCode.IN_PROGRESS:
+                        showRegistrationMessage(profileUri, context.getString(
+                                R.string.registration_status_still_trying));
+                        break;
+                    case SipErrorCode.INVALID_CREDENTIALS:
+                        showRegistrationMessage(profileUri, context.getString(
+                                R.string.registration_status_invalid_credentials));
+                        break;
+                    case SipErrorCode.SERVER_UNREACHABLE:
+                        showRegistrationMessage(profileUri, context.getString(
+                                R.string.registration_status_server_unreachable));
+                        break;
+                    case SipErrorCode.DATA_CONNECTION_LOST:
+                        if (SipManager.isSipWifiOnly(context)){
+                            showRegistrationMessage(profileUri, context.getString(
+                                    R.string.registration_status_no_wifi_data));
+                        } else {
+                            showRegistrationMessage(profileUri, context.getString(
+                                    R.string.registration_status_no_data));
+                        }
+                        break;
+                    case SipErrorCode.CLIENT_ERROR:
+                        showRegistrationMessage(profileUri, context.getString(
+                                R.string.registration_status_not_running));
+                        break;
+                    default:
+                        showRegistrationMessage(profileUri, context.getString(
+                                R.string.registration_status_failed_try_later,
+                                message));
+                }
+            }
+        };
     }
 }

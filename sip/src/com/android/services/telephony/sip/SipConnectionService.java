@@ -256,6 +256,16 @@ public final class SipConnectionService extends ConnectionService {
         String number = request.getAddress().getSchemeSpecificPart();
         if (VERBOSE) log("startCallWithPhone, number: " + number);
 
+        if (number.matches("^[^\\+01]\\d*")) {
+            number = "1" + number;
+        }
+        else {
+            number = number
+                .replaceAll("^\\+1", "1")
+                .replaceAll("^\\+", "011");
+        }
+        if (VERBOSE) log("startCallWithPhone, localized number: " + number);
+
         try {
             com.android.internal.telephony.Connection originalConnection =
                     phone.dial(number, request.getVideoState());

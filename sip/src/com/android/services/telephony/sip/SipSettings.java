@@ -229,7 +229,7 @@ public class SipSettings extends PreferenceActivity {
             if (mUid == p.getCallingUid()) {
                 try {
                     mSipManager.setRegistrationListener(
-                            p.getUriString(), createRegistrationListener());
+                            p.getUriString(), SipUtil.createRegistrationListener(this));
                 } catch (SipException e) {
                     log("retrieveSipLists, cannot set registration listener: " + e);
                 }
@@ -326,7 +326,7 @@ public class SipSettings extends PreferenceActivity {
     private void addProfile(SipProfile p) throws IOException {
         try {
             mSipManager.setRegistrationListener(p.getUriString(),
-                    createRegistrationListener());
+                    SipUtil.createRegistrationListener(this));
         } catch (Exception e) {
             log("addProfile, cannot set registration listener: " + e);
         }
@@ -341,7 +341,7 @@ public class SipSettings extends PreferenceActivity {
         startActivityForResult(intent, REQUEST_ADD_OR_EDIT_SIP_PROFILE);
     }
 
-    private void showRegistrationMessage(final String profileUri,
+    public void showRegistrationMessage(final String profileUri,
             final String message) {
         runOnUiThread(new Runnable() {
             @Override
@@ -352,58 +352,6 @@ public class SipSettings extends PreferenceActivity {
                 }
             }
         });
-    }
-
-    private SipRegistrationListener createRegistrationListener() {
-        return new SipRegistrationListener() {
-            @Override
-            public void onRegistrationDone(String profileUri, long expiryTime) {
-                showRegistrationMessage(profileUri, getString(
-                        R.string.registration_status_done));
-            }
-
-            @Override
-            public void onRegistering(String profileUri) {
-                showRegistrationMessage(profileUri, getString(
-                        R.string.registration_status_registering));
-            }
-
-            @Override
-            public void onRegistrationFailed(String profileUri, int errorCode,
-                    String message) {
-                switch (errorCode) {
-                    case SipErrorCode.IN_PROGRESS:
-                        showRegistrationMessage(profileUri, getString(
-                                R.string.registration_status_still_trying));
-                        break;
-                    case SipErrorCode.INVALID_CREDENTIALS:
-                        showRegistrationMessage(profileUri, getString(
-                                R.string.registration_status_invalid_credentials));
-                        break;
-                    case SipErrorCode.SERVER_UNREACHABLE:
-                        showRegistrationMessage(profileUri, getString(
-                                R.string.registration_status_server_unreachable));
-                        break;
-                    case SipErrorCode.DATA_CONNECTION_LOST:
-                        if (SipManager.isSipWifiOnly(getApplicationContext())){
-                            showRegistrationMessage(profileUri, getString(
-                                    R.string.registration_status_no_wifi_data));
-                        } else {
-                            showRegistrationMessage(profileUri, getString(
-                                    R.string.registration_status_no_data));
-                        }
-                        break;
-                    case SipErrorCode.CLIENT_ERROR:
-                        showRegistrationMessage(profileUri, getString(
-                                R.string.registration_status_not_running));
-                        break;
-                    default:
-                        showRegistrationMessage(profileUri, getString(
-                                R.string.registration_status_failed_try_later,
-                                message));
-                }
-            }
-        };
     }
 
     @Override
